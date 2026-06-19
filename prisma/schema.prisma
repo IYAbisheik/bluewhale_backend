@@ -8,11 +8,82 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  twoFactorEnabled  Boolean  @default(false)
-  twoFactorSecret   String?
-  createdAt DateTime @default(now())
+  id               Int          @id @default(autoincrement())
+  name             String
+  email            String       @unique
+  password         String
+  createdAt        DateTime     @default(now())
+  twoFactorEnabled Boolean      @default(false)
+  twoFactorSecret  String?
+  userName         String       @unique
+  role             Role         @default(USER)
+  avatar           String?
+  messages         Message[]
+  roomMembers      RoomMember[]
+  createdRooms     Room[]       @relation("RoomCreator")
+}
+
+model Room {
+  id         Int          @id @default(autoincrement())
+  roomName   String
+  inviteCode String       @unique
+  createdBy  Int
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  maxMembers Int          @default(6)
+  status     RoomStatus   @default(WAITING)
+  messages   Message[]
+  members    RoomMember[]
+  creator    User         @relation("RoomCreator", fields: [createdBy], references: [id])
+
+  @@map("rooms")
+}
+
+model RoomMember {
+  id         Int      @id @default(autoincrement())
+  roomId     Int
+  userId     Int
+  joinedAt   DateTime @default(now())
+  isMuted    Boolean  @default(false)
+  isOnline   Boolean  @default(false)
+  isSpeaking Boolean  @default(false)
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+  @@map("room_members")
+}
+
+model Message {
+  id        Int         @id @default(autoincrement())
+  roomId    Int
+  senderId  Int
+  createdAt DateTime    @default(now())
+  content   String
+  type      MessageType @default(TEXT)
+  room      Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender    User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum RoomStatus {
+  WAITING
+  ACTIVE
+  ENDED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  GIF
 }

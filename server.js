@@ -3,13 +3,64 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./src/modules/Users/routes/user.routes.js";
 import platformRoutes from "./src/modules/platform/routes/platform.routes.js"
+import v1Router from "./src/modules/V1Router.js"
+import morgan from "morgan";
+import fs from "fs";
+import path from "path";
+import { requestLogger } from "./src/modules/utils/generateToken.js";
+import cookieParser from "cookie-parser";
+import http from "http";
+import { Server } from "socket.io";
+import jwt from "jsonwebtoken";
+import { initializeSocket } from "./src/sockets/socket.handler.js";
+import { socketAuth } from "./src/middlewares/socketAuth.middleware.js";
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors());
+const logDir = path.join(process.cwd(), "logs");
+
+const server = http.createServer(app);
+
+export const io = new Server(server, {
+    cors: {
+        origin: process.env.CLIENT_URL || "http://localhost:3000",
+        credentials: true,
+    },
+});
+
+io.use(socketAuth);
+
+initializeSocket(io)
+
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
+
+const accessLogStream = fs.createWriteStream(
+  path.join(logDir, "access.log"),
+  { flags: "a" }
+);
+
+app.use(morgan("combined", {
+  stream: accessLogStream,
+}));
+
+app.use(morgan("dev"));
+
+app.use(
+    cors({
+        origin: "http://localhost:3000",
+        credentials: true,
+    })
+);
 app.use(express.json());
+
+app.use(requestLogger);
+app.use(cookieParser());
+
+app.use("/api/v1", v1Router);
 
 app.get("/", (req, res) => {
   res.send("Node.js backend is running!");
@@ -23,8 +74,9 @@ app.get("/api/message", (req, res) => {
 app.use("/api/users", authRoutes);
 app.use("/api/platform", platformRoutes)
 
+
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });

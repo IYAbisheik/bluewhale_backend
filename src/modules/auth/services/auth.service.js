@@ -1,28 +1,67 @@
-const prisma = require("../prisma/prismaClient");
+import prisma from "../../../config/prisma.js";
 
-const bcrypt = require("bcryptjs");
+import bcrypt from "bcryptjs";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
+import jwt from "jsonwebtoken";
 
-const speakeasy = require("speakeasy");
-
-const QRCode = require("qrcode");
-
-const { generateToken } = require("../utils/jwt");
+import generateToken, { generateRefreshToken } from "../../utils/generateToken.js";
+import { onHandleEmailTrigger } from "../../../services/email/email.route.js";
 
 
 // REGISTER USER
 
-const registerUser = async (body) => {
+export const registerUser = async (body) => {
+  const { email, password, name, userName } = body;
 
-  const { email, password } = body;
-
+  if (!name || !email || !password || !userName) {
+    throw new Error(
+      'Name, email, userName and password are required'
+    );
+  }
   const hashedPassword =
     await bcrypt.hash(password, 10);
 
+  const existingUser =
+    await prisma.user.findUnique({
+      where: { email },
+    });
+
+  if (existingUser) {
+    throw new Error(
+      'User already exists with this email'
+    );
+  }
+
   const user = await prisma.user.create({
     data: {
+      name,
       email,
-      password: hashedPassword
+      userName,
+      password: hashedPassword,
+    },
+  });
+
+  const verificationToken = jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "1d",
     }
+  );
+
+  console.log("LINE56", verificationToken, process.env.JWT_SECRET);
+
+  await onHandleEmailTrigger({
+    toAddress: user.email,
+    subject: "Verify Your Email",
+    data: {
+      name: user.name,
+      verificationLink: `http://localhost:3000/verify-email/${verificationToken}`,
+    },
   });
 
   return user;
@@ -31,14 +70,13 @@ const registerUser = async (body) => {
 
 // LOGIN USER
 
-const loginUser = async (body) => {
-
+export const loginUser = async (body) => {
   const { email, password } = body;
 
   const user = await prisma.user.findUnique({
     where: {
-      email
-    }
+      email,
+    },
   });
 
   if (!user) {
@@ -55,41 +93,52 @@ const loginUser = async (body) => {
     throw new Error("Invalid password");
   }
 
-  // CHECK 2FA
-
   if (user.twoFactorEnabled) {
-
     return {
       twoFactorRequired: true,
-      userId: user.id
+      userId: user.id,
     };
   }
 
   const token = generateToken({
-    id: user.id
+    id: user?.id,
   });
 
+  const refreshtoken = generateRefreshToken({
+    id: user?.id,
+  })
+
   return {
-    token
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+    },
+    accessToken: token,
+    refreshtoken
   };
 };
 
 
 // GENERATE 2FA
 
-const generateTwoFactor = async (userId) => {
-
-  const secret = speakeasy.generateSecret({
-    name: "MyApp"
-  });
+export const generateTwoFactor = async (
+  userId
+) => {
+  const secret =
+    speakeasy.generateSecret({
+      name: "whaleIQ",
+    });
 
   await prisma.user.update({
     where: {
-      id: userId
+      id: userId,
     },
     data: {
-      twoFactorSecret: secret.base32
-    }
+      twoFactorSecret:
+        secret.base32,
+    },
   });
 
   const qrCode =
@@ -98,29 +147,30 @@ const generateTwoFactor = async (userId) => {
     );
 
   return {
-    qrCode
+    qrCode,
   };
 };
 
 
 // VERIFY ENABLE 2FA
 
-const verifyTwoFactor = async (
+export const verifyTwoFactor = async (
   userId,
   token
 ) => {
-
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId
-    }
-  });
+  const user =
+    await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
 
   const verified =
     speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret:
+        user.twoFactorSecret,
       encoding: "base32",
-      token
+      token,
     });
 
   if (!verified) {
@@ -129,57 +179,136 @@ const verifyTwoFactor = async (
 
   await prisma.user.update({
     where: {
-      id: userId
+      id: userId,
     },
     data: {
-      twoFactorEnabled: true
-    }
+      twoFactorEnabled: true,
+    },
   });
 
   return {
-    message: "2FA enabled"
+    message: "2FA enabled",
   };
 };
 
 
 // VERIFY LOGIN OTP
 
-const verifyLoginOtp = async (
+export const verifyLoginOtp = async (
   userId,
   otp
 ) => {
+  const user =
+    await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
 
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId
-    }
-  });
+  console.log("LINE163", user, userId, otp);
 
   const verified =
     speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
+      secret:
+        user.twoFactorSecret,
       encoding: "base32",
-      token: otp
+      token: otp,
     });
+
+  console.log("LINE173", verified);
 
   if (!verified) {
     throw new Error("Invalid OTP");
   }
 
-  const token = generateToken({
-    id: user.id
-  });
+  const token =
+    generateToken({
+      id: user.id,
+    });
 
   return {
-    token
+    token,
   };
 };
 
+export const disableTwoFactor = async (
+  userId
+) => {
 
-module.exports = {
-  registerUser,
-  loginUser,
-  generateTwoFactor,
-  verifyTwoFactor,
-  verifyLoginOtp
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      twoFactorEnabled: false,
+      twoFactorSecret: null,
+    },
+  });
+
+  return {
+    message: "2FA disabled successfully",
+  };
+};
+
+export const verifyEmail = async (token) => {
+    try {
+      console.log("LINE250", token);
+      
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET
+        );
+console.log("LINE256", decoded);
+        const user = await prisma.user.findUnique({
+    where: {
+        id: decoded.userId,
+    },
+});
+
+        if (!user) { 
+            throw {
+                statusCode: 404,
+                message: "User not found.",
+            };
+        }
+
+        if (user.isEmailVerified) {
+            return {
+                message:
+                    "Email is already verified.",
+            };
+        }
+
+        await user.update({
+            isEmailVerified: true,
+        });
+
+        return {
+            message:
+                "Email verified successfully.",
+        };
+
+    } catch (error) {
+        if (
+            error.name === "TokenExpiredError"
+        ) {
+            throw {
+                statusCode: 400,
+                message:
+                    "Verification link has expired.",
+            };
+        }
+
+        if (
+            error.name === "JsonWebTokenError"
+        ) {
+            throw {
+                statusCode: 400,
+                message:
+                    "Invalid verification link.",
+            };
+        }
+
+        throw error;
+    }
 };

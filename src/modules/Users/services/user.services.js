@@ -41,13 +41,22 @@ export const signupService = async (payload) => {
 
   // CREATE USER
 
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-    },
-  });
+  // const user = await prisma.user.create({
+  //   data: {
+  //     name,
+  //     email,
+  //     password: hashedPassword,
+  //   },
+  // });
+
+  const user = {
+    name,
+    email,
+    password: hashedPassword,
+  }
+
+  // For Verification Email
+  onHandleEmailTrigger({toAddress: email, data: {name: user.name}})
 
   return {
     user: {
