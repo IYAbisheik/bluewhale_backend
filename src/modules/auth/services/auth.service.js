@@ -7,6 +7,7 @@ import jwt from "jsonwebtoken";
 
 import generateToken, { generateRefreshToken } from "../../utils/generateToken.js";
 import { onHandleEmailTrigger } from "../../../services/email/email.route.js";
+import { correctDescriptions } from "../../gemini/controllers/aiController.js";
 
 
 // REGISTER USER
@@ -51,7 +52,7 @@ export const registerUser = async (body) => {
     {
       expiresIn: "1d",
     }
-  );
+  )
 
   console.log("LINE56", verificationToken, process.env.JWT_SECRET);
 
@@ -107,6 +108,8 @@ export const loginUser = async (body) => {
   const refreshtoken = generateRefreshToken({
     id: user?.id,
   })
+
+    correctDescriptions()
 
   return {
     user: {
