@@ -1,4 +1,4 @@
-import { signupService, loginService } from '../services/user.services.js';
+import { signupService, loginService, getCurrentUserService } from '../services/user.services.js';
 
 // SIGNUP CONTROLLER
 export const signup = async (req, res) => {
@@ -38,4 +38,32 @@ export const login = async (req, res) => {
       message: error.message,
     });
   }
+};
+
+export const getCurrentUser = async (
+    req,
+    res
+) => {
+    try {
+
+        const user =
+            await getCurrentUserService(
+                req.user.id
+            );
+
+        return res.status(200).json({
+            success: true,
+            data: user,
+        });
+
+    } catch (error) {
+
+        console.error(error);
+
+        return res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+
+    }
 };

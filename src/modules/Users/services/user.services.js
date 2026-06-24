@@ -276,3 +276,22 @@ export const verifyLoginOtpService =
       accessToken,
     };
   };
+
+export const getCurrentUserService =
+    async (userId) => {
+
+        const user =
+            await prisma.user.findUnique({
+                where: {
+                    id: userId,
+                }
+            });
+
+        if (!user) {
+            throw new Error(
+                "User not found"
+            );
+        }
+
+        return user;
+    };
