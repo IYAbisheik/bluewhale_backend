@@ -30,19 +30,23 @@ class RoomRepository {
 
     }
 
-    async checkMember(
+async checkMember(roomId, userId) {
+    console.log({
         roomId,
-        userId
-    ) {
+        userId,
+        roomIdType: typeof roomId,
+        userIdType: typeof userId,
+    });
 
-        return prisma.roomMember.findFirst({
-            where: {
-                roomId,
-                userId
-            }
-        });
-
-    }
+    const findUser = prisma.roomMember.findFirst({
+        where: {
+            roomId,
+            userId,
+        },
+    })
+    
+    return findUser;
+}
 
     async getRooms(userId) {
 

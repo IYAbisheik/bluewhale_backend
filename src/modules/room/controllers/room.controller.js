@@ -72,12 +72,15 @@ class RoomController {
 
         try {
 
+            console.log("LINE75", req.params.roomId, req.user.id);
+            
             const room =
                 await roomService.getRoomById(
                     Number(req.params.roomId),
                     req.user.id
                 );
 
+            
             return res.json({
                 success: true,
                 data: room

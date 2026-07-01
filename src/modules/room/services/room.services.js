@@ -115,6 +115,9 @@ class RoomService {
                 roomId,
                 userId
             );
+        
+        console.log("LINE119", member);
+        
 
         if (!member) {
 

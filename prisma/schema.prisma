@@ -8,7 +8,7 @@ datasource db {
 }
 
 model User {
-  id               Int          @id @default(autoincrement())
+  id               String       @id @default(uuid())
   name             String
   email            String       @unique
   password         String
@@ -24,10 +24,10 @@ model User {
 }
 
 model Room {
-  id         Int          @id @default(autoincrement())
+  id         String       @id @default(uuid())
   roomName   String
   inviteCode String       @unique
-  createdBy  Int
+  createdBy  String
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   maxMembers Int          @default(6)
@@ -40,9 +40,9 @@ model Room {
 }
 
 model RoomMember {
-  id         Int      @id @default(autoincrement())
-  roomId     Int
-  userId     Int
+  id         String   @id @default(uuid())
+  roomId     String
+  userId     String
   joinedAt   DateTime @default(now())
   isMuted    Boolean  @default(false)
   isOnline   Boolean  @default(false)
@@ -57,9 +57,9 @@ model RoomMember {
 }
 
 model Message {
-  id        Int         @id @default(autoincrement())
-  roomId    Int
-  senderId  Int
+  id        String      @id @default(uuid())
+  roomId    String
+  senderId  String
   createdAt DateTime    @default(now())
   content   String
   type      MessageType @default(TEXT)
